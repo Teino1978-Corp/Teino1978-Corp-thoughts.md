@@ -58,7 +58,7 @@ Manager.new do |m|
     # Try to acquire a task
     if target_task = tasks.select { |k, v| v.nil? }.shuffle.first
       m.kv.check_and_set(
-        key: "tasks',
+        key: "tasks",
         check: idx,
         value: tasks.merge(target_task: m.node),
         on_success: ->() { `/start_my_job.sh` },  # If we acquired this key, start doing stuff
