@@ -29,12 +29,12 @@ Consul provides a mechanism for service discovery and consistent, distributed KV
 We'll use the same basic terminology as [Helix](http://helix.apache.org/Concepts.html): a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance and eventually exactly-one instance.  (One difference between this proposal and Helix is that I'm not building in any type of restrictions on how instances can transition between partitions, ie Master/Slave separation)
 
 The nodes need to handle a few events:
-* Rebalance: When the cluster topology changes, a new partition mapping is computed.  Processing on assumed partitions which are no longer assigned is terminated and the partitions are released.  Assigned partitions which are not assumed are acquired as they become available and processing is started.  This should be done in a deterministic manner, for example using the [RUSH](http://www.ssrc.ucsc.edu/media/papers/honicky-ipdps04.pdf) algorithm. (Executed by all instances)
-* Enter: When an instance enters the cluster it registers itself with the cluster. (Executed by the instance entering the cluster)
-* Leave: When an instance leaves the cluster, it terminates processing on assumed partitions, releases its assumed partitions and deregisters itself from the cluster. (Executed by the instance leaving the cluster)
-* Local failure: When an instance loses its connection to the cluster, it terminates processing on assumed partitions. (Executed by the instance which failed)
-* Remote failure: When an instance become unresponsive, its partitions are released and it is deregistered from the cluser by another instance. (Executed by all instances)
-* Health check failure: When an instance's health check fails, it optionally executes user-defined handlers - we make no assumptions about the implications of a health check fail. (Executed by the instance whose health-check failed)
+* __Rebalance__: When the cluster topology changes, a new partition mapping is computed.  Processing on assumed partitions which are no longer assigned is terminated and the partitions are released.  Assigned partitions which are not assumed are acquired as they become available and processing is started.  This should be done in a deterministic manner, for example using the [RUSH](http://www.ssrc.ucsc.edu/media/papers/honicky-ipdps04.pdf) algorithm. (Executed by all instances)
+* __Enter__: When an instance enters the cluster it registers itself with the cluster. (Executed by the instance entering the cluster)
+* __Leave__: When an instance leaves the cluster, it terminates processing on assumed partitions, releases its assumed partitions and deregisters itself from the cluster. (Executed by the instance leaving the cluster)
+* __Local failure__: When an instance loses its connection to the cluster, it terminates processing on assumed partitions. (Executed by the instance which failed)
+* __Remote failure__: When an instance become unresponsive, its partitions are released and it is deregistered from the cluser by another instance. (Executed by all instances)
+* __Health check failure__: When an instance's health check fails, it optionally executes user-defined handlers - we make no assumptions about the implications of a health check fail. (Executed by the instance whose health-check failed)
 
 
 To accomplish these events, the following actions need to be implemented:
