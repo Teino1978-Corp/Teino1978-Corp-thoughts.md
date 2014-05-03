@@ -18,8 +18,8 @@ An ideal solution would satisfy a couple objectives
 We've tried a couple approaches to solving this:
 
 * Tell each computer what it's supposed to do when we provision it, and alert a human when something fails (OIB scheduler box).  This fails #'s 2 & 3 (at least for singular resources like the scheduler)
-* Each instance claims a task for a duration of time and coordinate through a central data store.  Cycle assignment regularly so failures can be healed (AMP instances).  This fails #5
-* Use a process management framework to do it for us (Storm topology).  This depends on the framework, but I don't know of any frameworks that satisfy all objectives.
+* Each instance claims a task for a duration of time and coordinates through a central data store.  Cycle assignment regularly so failures can be healed (AMP instances).  This fails #5
+* Use a process management framework to do it for us (Storm topology).  This depends on the framework, but I don't know of any frameworks that satisfy all objectives (particularly #4)
 
 
 ## Proposed Solution
