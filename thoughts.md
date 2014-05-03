@@ -30,7 +30,7 @@ Consul provides a mechanism for service discovery and consistent, distributed KV
 
 ### Basic Architecture
 
-We'll use the same basic terminology as [Helix](http://helix.apache.org/Concepts.html): a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance and eventually exactly-one instance.  (One difference between this proposal and Helix is that I'm not building in any type of restrictions on how instances can transition between partitions, ie Master/Slave separation)
+We'll use the same basic terminology as [Helix](http://helix.apache.org/Concepts.html): a cluster is made up of a number of instances and a number of partitions.  Each instance processes as many partitions as are required to fully consume the partitions.  The task is to ensure that each partition as assigned to at-most-one instance and eventually exactly-one instance.  (One difference between this proposal and Helix is that I'm not building in any type of restrictions on how instances can transition between partitions or what partitions can be co-located on an instance, ie Master/Slave separation)
 
 Partitions exist in one of 2 states, __assumed__ partitions have been acknowledged by the instance which owns them, while __assigned__ partitions have not.  Because partition allocation is deterministic given a set of partitions & instances, a there is always a mapping from a partition to an instance, however instances must explicitly 'assume' responsiblity for a partition.  This ensures that partition assignment remains consistent during topology transitions, and allows instances to signal that they have released ownership of a partition and it is ready to be transferred to its new owner.
 
