@@ -24,11 +24,18 @@ We've tried a couple approaches to solving this:
 
 ## Proposed Solution
 
+### Preliminaries
+
 Consul provides a mechanism for service discovery and consistent, distributed KV store.  It provides an HTTP api which accepts blocking requests which can be used to generate event handlers when the KV store (or the cluster topology) changes.  I propose we build a daemon which handles cluster management on top of these capabilities.
+
+### Basic Architecture
 
 We'll use the same basic terminology as [Helix](http://helix.apache.org/Concepts.html): a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance and eventually exactly-one instance.  (One difference between this proposal and Helix is that I'm not building in any type of restrictions on how instances can transition between partitions, ie Master/Slave separation)
 
 Partitions exist in one of 2 states, __assumed__ partitions have been acknowledged by the instance which owns them, while __assigned__ partitions have not.  Because partition allocation is deterministic given a set of partitions & instances, a there is always a mapping from a partition to an instance, however instances must explicitly 'assume' responsiblity for a partition.  This ensures that partition assignment remains consistent during topology transitions, and allows instances to signal that they have released ownership of a partition and it is ready to be transferred to its new owner.
+
+
+### Events
 
 The nodes need to handle a few events:
 * __Rebalance__: When the cluster topology changes, a new partition mapping is computed.  Processing on assumed partitions which are no longer assigned is terminated and the partitions are released.  Assigned partitions which are not assumed are acquired as they become available and processing is started.  This should be done in a deterministic manner, for example using the [RUSH](http://www.ssrc.ucsc.edu/media/papers/honicky-ipdps04.pdf) algorithm. (Executed by all instances)
@@ -39,7 +46,10 @@ The nodes need to handle a few events:
 * __Health check failure__: When an instance's health check fails, it optionally executes user-defined handlers - we make no assumptions about the implications of a health check fail. (Executed by the instance whose health-check failed)
 
 
+### Actions
+
 To accomplish these events, the following actions need to be implemented:
+
 * Compute partition map based on the cluster topology and the instance's identity
 * Transition from one partition map to another
 * Enter the cluster
@@ -53,10 +63,22 @@ To accomplish these events, the following actions need to be implemented:
 * Release a partition
 * Respond to a failing health check
 
+
+### Cluster Description
+
 Finally, we can describe information required to describe a cluster:
+
 * A mapping from partitions to the instances which have assumed them (or null if not assumed)
 * A mapping from instances known to the cluster to their current state (alive or failed)
 * The action required to begin processing
 * The action required to terminate processing
 * The action required to respond to a health check failure
 * The address of at least one Consul server
+
+
+### Failure Modes
+
+* __Listeners fail to trigger transitions__.  This should result in partitions not being released.  Because partitions must be acquired before they're processed, the consistent KV store should prevent multiple machines from processing a partition, even if portions of the cluster have a different opinion about the current partition mapping.
+* __Transient instance failures__.  This can result in partitions 'thrashing' between instances.  It's probably worth establishing a minimum failure time before an instance is forced out of the cluster and its partitions re-assigned.
+* __Local failure + listener failure__.  In this case the failed instance could be unaware that it has lost its connection to the cluster, and could result in partitions being processed by multiple nodes.  Hopefully the types of failures that would cause this situation would also cause the instance to be unable to process its partition.
+* __Performance discrepancy between instances__.  Because partition assignments are static, it's possible for some partitions to be processed more efficiently than others.  It may be worth allowing the partition mappings to be shuffled occasionally to handle this situation (but it's probably better to just increase the cluster capacity).
