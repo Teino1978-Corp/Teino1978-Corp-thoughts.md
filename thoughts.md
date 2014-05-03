@@ -26,7 +26,7 @@ We've tried a couple approaches to solving this:
 
 Consul provides a mechanism for service discovery and consistent, distributed KV store.  It provides an HTTP api which accepts blocking requests which can be used to generate event handlers when the KV store (or the cluster topology) changes.  I propose we build a daemon which handles cluster management on top of these capabilities.
 
-We'll use the same basic terminology as Helix: a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance
+We'll use the same basic terminology as Helix: a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance.  (One difference between this proposal and Helix is that I'm not building in any type of restrictions on how instances can transition between partitions, ie Master/Slave separation)
 
 The nodes need to handle a few events:
 * Rebalance: When the cluster topology changes, a new partition mapping is computed.  Processing on assumed partitions which are no longer assigned is terminated and the partitions are released.  Assigned partitions which are not assumed are acquired as they become available and processing is started. (Executed by all instances)
