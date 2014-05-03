@@ -28,99 +28,33 @@ Consul provides a mechanism for service discovery and consistent, distributed KV
 
 We'll use the same basic terminology as Helix: a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance
 
-The nodes need to execute a few basic actions:
-* Rebalance: When the cluster topology changes, a new partition mapping is computed.  Processing on assumed partitions which are no longer assigned is terminated and the partitions are released.  Assigned partitions which are not assumed are acquired as they become available and processing is started
-* Enter: When an instance enters the cluster it registers itself with the cluster
-* Leave: When an instance leaves the cluster, it terminates processing on assumed partitions, releases its assumed partitions and deregisters itself from the cluster
-* Local failure: When an instance loses its connection to the cluster, it terminates processing on assumed partitions
-* Remote failure: When an instance become unresponsive, its partitions are released and it is deregistered from the cluser by another instance.
-* Health check failure: When an instance's health check fails, it optionally executes user-defined handlers (ie, we make no assumptions about the implications of a health check fail)
+The nodes need to handle a few events:
+* Rebalance: When the cluster topology changes, a new partition mapping is computed.  Processing on assumed partitions which are no longer assigned is terminated and the partitions are released.  Assigned partitions which are not assumed are acquired as they become available and processing is started. (Executed by all instances)
+* Enter: When an instance enters the cluster it registers itself with the cluster. (Executed by the instance entering the cluster)
+* Leave: When an instance leaves the cluster, it terminates processing on assumed partitions, releases its assumed partitions and deregisters itself from the cluster. (Executed by the instance leaving the cluster)
+* Local failure: When an instance loses its connection to the cluster, it terminates processing on assumed partitions. (Executed by the instance which failed)
+* Remote failure: When an instance become unresponsive, its partitions are released and it is deregistered from the cluser by another instance. (Executed by all instances)
+* Health check failure: When an instance's health check fails, it optionally executes user-defined handlers - we make no assumptions about the implications of a health check fail. (Executed by the instance whose health-check failed)
 
 
+To accomplish these events, the following actions need to be implemented:
+* Compute partition map based on the cluster topology and the instance's identity
+* Transition from one partition map to another
+* Enter the cluster
+* Leave the cluster
+* Force another node to leave the cluster
+* Listen for topology changes
+* Listen for partition asignment changes
+* Begin processing
+* Terminate processing
+* Acquire a partition
+* Release a partition
+* Respond to a failing health check
 
-
-The daemon would be configured to respond to various events:
-
-```ruby
-Manager.new do |m|
-  # Execute this when the daemon first starts up
-  m.bootstrap do
-    # Fetch the current value and ModifyIndex of the key 'tasks'
-    tasks, idx = m.kv.get("tasks")
-    
-    unless tasks
-      # If the expected tasks haven't been defined, create them with empty values
-      new_tasks = {
-        "Consume Kafka Partition 1": nil,
-        "Consume Kafka Partition 2": nil,
-        # ...
-      }
-      
-      # Write these to the store (assuming they still don't exist)
-      m.kv.check_and_set(
-        key: "tasks", 
-        check: idx,
-        value: new_tasks
-      )
-    end
-  end
-  
-  m.bootstrap do
-    tasks, idx = m.kv.get("tasks")
-    
-    # Try to acquire a task
-    if target_task = tasks.select { |k, v| v.nil? }.shuffle.first
-      m.kv.check_and_set(
-        key: "tasks",
-        check: idx,
-        value: tasks.merge(target_task: m.node),
-        on_success: ->() { `/start_my_job.sh` },  # If we acquired this key, start doing stuff
-        on_failure: ->() { retry },               # Otherwise, try again
-      )
-    end
-  end
-  
-  # Monitor this HTTP endpoint for changes and execute the block with the old & new responses on change
-  m.on_change("/v1/health/service/kafka_consumers") do |old, new|
-    old_failing = old.select { |h| h["Status"] == failing }.map { |h| h["Node"] }
-    new_failing = new.select { |h| h["Status"] == failing }.map { |h| h["Node"] }
-    
-    # Terminate instances with failing health checks
-    (new_failing - old_failing).each do |newly_failed_node|
-      terminate_instance(newly_failed_node)
-    end
-  end
-  
-  m.on_change("/v1/catalog/nodes") do |old, new|
-    removed_nodes = (old - new).map { |h| h["Node"] }
-    
-    tasks, idx = m.kv.get("tasks")
-    new_tasks = tasks.hash_map { |k, v| removed_nodes.include?(v) ? nil : v }
-    
-    m.kv.check_and_set(
-      key: "tasks",
-      check: idx,
-      value: new_tasks,
-      on_failure: ->() { retry }  # If another process modified the key, start over
-    end
-  end
-  
-  m.teardown do
-    # Gracefully remove this instance from the task assignment hash
-    tasks, idx = m.kv.get("tasks")
-    new_tasks = tasks.hash_map { |k, v| v == m.node ? nil : v }
-    
-    m.kv.check_and_set(
-      key: "tasks",
-      check: idx,
-      value: new_tasks,
-      on_failure: ->() { retry }
-    end
-  end
-end
-
-# Run the daemon!
-Manager.run
-```
-
-Obviously these specific tasks need some work, but you get the idea of the daemon API.
+Finally, we can describe information required to describe a cluster:
+* A mapping from partitions to the instances which have assumed them (or null if not assumed)
+* A mapping from instances known to the cluster to their current state (alive or failed)
+* The action required to begin processing
+* The action required to terminate processing
+* The action required to respond to a health check failure
+* The address of at least one Consul server
