@@ -26,6 +26,19 @@ We've tried a couple approaches to solving this:
 
 Consul provides a mechanism for service discovery and consistent, distributed KV store.  It provides an HTTP api which accepts blocking requests which can be used to generate event handlers when the KV store (or the cluster topology) changes.  I propose we build a simple daemon which handles cluster management on top of these capabilities.
 
+We'll use the same basic terminology as Helix: a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance
+
+The nodes need to execute a few basic actions:
+* Rebalance: When the cluster topology changes, a new partition mapping is computed.  Processing on assumed partitions which are no longer assigned is terminated and the partitions are released.  Assigned partitions which are not assumed are acquired as they become available and processing is started
+* Enter: When an instance enters the cluster it registers itself with the cluster
+* Leave: When an instance leaves the cluster, it terminates processing on assumed partitions, releases its assumed partitions and deregisters itself from the cluster
+* Local failure: When an instance loses its connection to the cluster, it terminates processing on assumed partitions
+* Remote failure: When an instance become unresponsive, its partitions are released and it is deregistered from the cluser by another instance.
+* Health check failure: When an instance's health check fails, it optionally executes user-defined handlers (ie, we make no assumptions about the implications of a health check fail)
+
+
+
+
 The daemon would be configured to respond to various events:
 
 ```ruby
