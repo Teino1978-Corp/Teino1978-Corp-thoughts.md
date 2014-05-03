@@ -24,7 +24,7 @@ We've tried a couple approaches to solving this:
 
 ## Proposed Solution
 
-Consul provides a mechanism for service discovery and consistent, distributed KV store.  It provides an HTTP api which accepts blocking requests which can be used to generate event handlers when the KV store (or the cluster topology) changes.  I propose we build a simple daemon which handles cluster management on top of these capabilities.
+Consul provides a mechanism for service discovery and consistent, distributed KV store.  It provides an HTTP api which accepts blocking requests which can be used to generate event handlers when the KV store (or the cluster topology) changes.  I propose we build a daemon which handles cluster management on top of these capabilities.
 
 We'll use the same basic terminology as Helix: a cluster is made up of a number of instances and a number of partitions.  The task is to ensure that each partition as assigned to at-most-one instance
 
